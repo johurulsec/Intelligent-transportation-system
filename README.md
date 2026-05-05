@@ -41,7 +41,7 @@ ITS/
 
 ## Requirements
 
-- Windows
+- Windows or Ubuntu
 - Python 3.10+
 - A valid vehicle YOLO model file
 - A valid license plate YOLO model file
@@ -59,9 +59,11 @@ These paths are configured in [traffic_config.py](/C:/Users/HP/Documents/ITS/tra
 - Capture folder: `d:\its-info\capture_vehicles`
 - Database file: `d:\its-info\transport.db`
 
-Update those paths if your files are stored somewhere else.
+These are example defaults for the current local setup. Update them in [traffic_config.py](/C:/Users/HP/Documents/ITS/traffic_config.py) for your own Windows or Ubuntu machine.
 
 ## Setup
+
+### Windows
 
 ### 1. Create and activate a virtual environment
 
@@ -113,12 +115,65 @@ Install Tesseract OCR on Windows, then make sure these exist:
 - `C:\Program Files\Tesseract-OCR\tessdata\ben.traineddata`
 - `C:\Program Files\Tesseract-OCR\tessdata\eng.traineddata`
 
+### Ubuntu
+
+### 1. Install system packages
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip tesseract-ocr tesseract-ocr-ben tesseract-ocr-eng libgl1 libglib2.0-0 fonts-noto-core
+```
+
+### 2. Create and activate a virtual environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Install Python dependencies
+
+```bash
+python -m pip install -r requirements.txt
+python -m pip install pytesseract
+```
+
+If you need CPU-only PyTorch on Ubuntu, install it from the official index that matches your platform.
+
+### 4. Update file paths in `traffic_config.py`
+
+Example Ubuntu-style paths:
+
+```python
+video_path = "/home/your-user/its-info/lpr-vehicle.mp4"
+model_path = "/home/your-user/its-info/yolov8n.pt"
+plate_model_path = "/home/your-user/its-info/license_plate_detector.pt"
+capture_root = "/home/your-user/its-info/capture_vehicles"
+database_path = "/home/your-user/its-info/transport.db"
+tesseract_cmd = "/usr/bin/tesseract"
+```
+
+### 5. Make sure the input files exist
+
+Place these files in your configured Ubuntu paths:
+
+- `lpr-vehicle.mp4`
+- `yolov8n.pt`
+- `license_plate_detector.pt`
+
 ## Run
 
 Start the application with:
 
 ```powershell
 .\.venv\Scripts\python main.py
+```
+
+On Ubuntu:
+
+```bash
+source .venv/bin/activate
+python main.py
 ```
 
 ## Capture Output
@@ -242,6 +297,11 @@ If you see a DLL or `torch` loading error:
 - reinstall PyTorch CPU wheels
 - make sure the Microsoft Visual C++ runtime is installed on Windows
 
+On Ubuntu, if OpenCV or Qt fails to start, make sure these are installed:
+
+- `libgl1`
+- `libglib2.0-0`
+
 ### Model file missing
 
 If the app says the model is missing, confirm:
@@ -264,6 +324,12 @@ If the OCR engine card shows `Unavailable`, confirm:
 - `ben.traineddata` exists
 - `eng.traineddata` exists
 - `tesseract.exe` matches the path in [traffic_config.py](/C:/Users/HP/Documents/ITS/traffic_config.py)
+
+On Ubuntu, confirm:
+
+- `/usr/bin/tesseract` exists
+- `tesseract --list-langs` shows `ben` and `eng`
+- Noto Bengali fonts are installed if you want cleaner Bangla text rendering on screen
 
 ## Future Improvements
 

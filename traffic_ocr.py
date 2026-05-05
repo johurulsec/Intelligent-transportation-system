@@ -54,6 +54,8 @@ class PlateOcrReader:
             [
                 r"C:\Program Files\Tesseract-OCR\tesseract.exe",
                 r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+                "/usr/bin/tesseract",
+                "/usr/local/bin/tesseract",
             ]
         )
 

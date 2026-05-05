@@ -157,6 +157,9 @@ class VehicleDetector:
             r"C:\Windows\Fonts\Nirmala.ttf",
             r"C:\Windows\Fonts\NirmalaB.ttf",
             r"C:\Windows\Fonts\arial.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSansBengali-Regular.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSerifBengali-Regular.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         ]
         for path in candidates:
             if os.path.exists(path):
