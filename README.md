@@ -3,6 +3,7 @@
 A desktop traffic-monitoring application built with Python, PyQt5, OpenCV, and Ultralytics YOLO. The app plays a video stream, detects vehicles, shows a live dashboard, saves cropped vehicle images into date-wise and vehicle-wise folders, and logs saved captures into SQLite.
 
 ![Output Interface](output-interface.png)
+![Output Interface](output-interface1.png)
 
 ## Features
 
