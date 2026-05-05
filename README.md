@@ -1,14 +1,17 @@
 # Intelligent Transportation System
 
-A desktop traffic-monitoring application built with Python, PyQt5, OpenCV, and Ultralytics YOLO. The app plays a video stream, detects vehicles, shows a live dashboard, saves cropped vehicle images into date-wise and vehicle-wise folders, and logs saved captures into SQLite.
+A desktop traffic-monitoring application built with Python, PyQt5, OpenCV, Ultralytics YOLO, and optional OCR support. The app plays a video stream, detects vehicles, detects license plates, shows a live dashboard, saves cropped vehicle and plate images, and logs saved captures into SQLite.
 
 ![Output Interface](output-interface.png)
 ![Output Interface](output-interface1.png)
+![Output Interface](output-interface-with-lp.png)
 
 ## Features
 
 - Live video monitoring with a PyQt5 desktop interface
 - Vehicle detection using YOLO
+- License plate detection using a second YOLO model
+- Optional OCR support for reading Bangla and English license plate text
 - Vehicle counting for common road vehicles:
   - `car`
   - `bus`
@@ -30,6 +33,7 @@ ITS/
 |-- traffic_detector.py
 |-- traffic_capture.py
 |-- traffic_database.py
+|-- traffic_ocr.py
 |-- requirements.txt
 |-- README.md
 |-- .venv/
@@ -39,15 +43,19 @@ ITS/
 
 - Windows
 - Python 3.10+
-- A valid YOLO model file
+- A valid vehicle YOLO model file
+- A valid license plate YOLO model file
 - A source video file
+- Tesseract OCR with Bengali and English language data for Bangla plate reading
 
 ## Default Paths
 
 These paths are configured in [traffic_config.py](/C:/Users/HP/Documents/ITS/traffic_config.py):
 
-- Video file: `d:\its-info\sample-vehicle2.mp4`
+- Video file: `d:\its-info\lpr-vehicle.mp4`
 - YOLO model: `d:\its-info\yolov8n.pt`
+- License plate model: `d:\its-info\license_plate_detector.pt`
+- Tesseract executable: `C:\Program Files\Tesseract-OCR\tesseract.exe`
 - Capture folder: `d:\its-info\capture_vehicles`
 - Database file: `d:\its-info\transport.db`
 
@@ -80,8 +88,30 @@ python -m pip install torch==2.5.1+cpu torchvision==0.20.1+cpu torchaudio==2.5.1
 
 Place these files in the configured locations:
 
-- `d:\its-info\sample-vehicle2.mp4`
+- `d:\its-info\lpr-vehicle.mp4`
 - `d:\its-info\yolov8n.pt`
+- `d:\its-info\license_plate_detector.pt`
+
+### 4. Install OCR for Bangla license plate reading
+
+Recommended OCR engine:
+
+- Tesseract OCR for Windows
+- Bengali language data: `ben`
+- English language data: `eng`
+- Python wrapper: `pytesseract`
+
+Install the Python wrapper:
+
+```powershell
+.\.venv\Scripts\python -m pip install pytesseract
+```
+
+Install Tesseract OCR on Windows, then make sure these exist:
+
+- `C:\Program Files\Tesseract-OCR\tesseract.exe`
+- `C:\Program Files\Tesseract-OCR\tessdata\ben.traineddata`
+- `C:\Program Files\Tesseract-OCR\tessdata\eng.traineddata`
 
 ## Run
 
@@ -109,7 +139,22 @@ Notes:
 
 - The saved image is the cropped vehicle only
 - The saved image does not include the drawn bounding box
+- If a plate is detected, the plate crop is also saved in a `plates` subfolder
 - Folders are created automatically if they do not exist
+
+Example plate output:
+
+```text
+d:\its-info\capture_vehicles\04-05-2026\car\plates\23-01-15-123.png
+```
+
+Example OCR text output:
+
+```text
+d:\its-info\capture_vehicles\04-05-2026\car\plates\23-01-15-123.txt
+```
+
+The `.txt` file stores the recognized license plate text in UTF-8 encoding.
 
 ## Database Logging
 
@@ -135,6 +180,10 @@ Each vehicle table stores:
 - `vehicle_type`
 - `image_name`
 - `image_path`
+- `plate_image_name`
+- `plate_image_path`
+- `plate_text`
+- `plate_text_path`
 - `captured_at`
 
 ## Current Architecture
@@ -157,15 +206,19 @@ Reusable UI widgets like the video tile and dashboard cards.
 
 ### `traffic_detector.py`
 
-YOLO model loading and vehicle detection logic.
+YOLO model loading and vehicle plus license plate detection logic.
 
 ### `traffic_capture.py`
 
-Vehicle crop saving logic and output folder management.
+Vehicle and plate crop saving logic and output folder management.
 
 ### `traffic_database.py`
 
 SQLite logging for saved vehicle images.
+
+### `traffic_ocr.py`
+
+OCR layer for reading Bangla and English license plate text.
 
 ## Notes About the Current Process
 
@@ -173,6 +226,8 @@ The current process is valid for a small desktop project and is much better stru
 
 - The app uses per-vehicle-type save cooldown logic to reduce duplicate image saving
 - The preview window shows bounding boxes, but saved captures do not
+- Plate OCR text can be shown near the plate bounding box when OCR is available
+- Plate OCR text can be saved into a `.txt` file beside the plate image
 - The database uses one table per vehicle type because that matches the current requirement
 
 For a larger production system, a single unified capture table and proper vehicle tracking would usually be stronger choices.
@@ -192,12 +247,23 @@ If you see a DLL or `torch` loading error:
 If the app says the model is missing, confirm:
 
 - `d:\its-info\yolov8n.pt` exists
+- `d:\its-info\license_plate_detector.pt` exists
 
 ### Video file missing
 
 If the app says the video is missing, confirm:
 
-- `d:\its-info\sample-vehicle2.mp4` exists
+- `d:\its-info\lpr-vehicle.mp4` exists
+
+### OCR unavailable
+
+If the OCR engine card shows `Unavailable`, confirm:
+
+- `pytesseract` is installed in `.venv`
+- Tesseract OCR is installed
+- `ben.traineddata` exists
+- `eng.traineddata` exists
+- `tesseract.exe` matches the path in [traffic_config.py](/C:/Users/HP/Documents/ITS/traffic_config.py)
 
 ## Future Improvements
 

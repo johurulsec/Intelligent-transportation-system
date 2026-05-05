@@ -1,5 +1,5 @@
 import os
-import random
+import urllib.request
 
 import cv2
 from PyQt5.QtCore import QDateTime, QTimer
@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindo
 from traffic_capture import VehicleCaptureSaver
 from traffic_database import CaptureDatabase
 from traffic_detector import VehicleDetector
+from traffic_ocr import PlateOcrReader
 from traffic_ui import DashboardCard, VideoTile
 
 
@@ -16,16 +17,20 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.config = config
         self.total = 0
+        self.total_plates = 0
         self.cap = cv2.VideoCapture(self.config.video_path)
         self.capture_database = CaptureDatabase(self.config.database_path)
+        self.plate_ocr_reader = PlateOcrReader(self.config.tesseract_cmd)
         self.capture_saver = VehicleCaptureSaver(
             capture_root=self.config.capture_root,
             save_cooldown_seconds=self.config.save_cooldown_seconds,
             capture_database=self.capture_database,
         )
         self.detector = VehicleDetector(
-            model_path=self.config.model_path,
+            vehicle_model_path=self.config.model_path,
+            plate_model_path=self.config.plate_model_path,
             capture_saver=self.capture_saver,
+            plate_ocr_reader=self.plate_ocr_reader,
         )
 
         self.setWindowTitle(self.config.window_title)
@@ -71,8 +76,8 @@ class MainWindow(QMainWindow):
         cards = QHBoxLayout()
         self.card1 = DashboardCard("Vehicles Detected")
         self.card2 = DashboardCard("Active Stream")
-        self.card3 = DashboardCard("Alerts")
-        self.card4 = DashboardCard("FPS")
+        self.card3 = DashboardCard("Plates Detected")
+        self.card4 = DashboardCard("OCR Engine")
         for card in [self.card1, self.card2, self.card3, self.card4]:
             cards.addWidget(card)
         content.addLayout(cards)
@@ -93,6 +98,52 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, title, message)
         self.close()
 
+    def _ensure_model_file(self, model_path, model_url, model_label):
+        if os.path.exists(model_path):
+            return True
+
+        message = (
+            f"Could not find the {model_label} model file:\n{os.path.abspath(model_path)}\n\n"
+        )
+        if model_url:
+            message += "Do you want to download it automatically now?"
+            answer = QMessageBox.question(
+                self,
+                "Model File Missing",
+                message,
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes,
+            )
+            if answer != QMessageBox.Yes:
+                return False
+
+            try:
+                self._download_model(model_url, model_path)
+            except Exception as exc:
+                self._show_startup_error(
+                    "Download Failed",
+                    f"Could not download the {model_label} model.\n\nDetails:\n{exc}",
+                )
+                return False
+
+            QMessageBox.information(
+                self,
+                "Download Complete",
+                f"The {model_label} model was downloaded successfully:\n{os.path.abspath(model_path)}",
+            )
+            return True
+
+        self._show_startup_error(
+            "Model File Missing",
+            message + "Automatic download is not configured for this model yet.",
+        )
+        return False
+
+    @staticmethod
+    def _download_model(model_url, model_path):
+        os.makedirs(os.path.dirname(model_path), exist_ok=True)
+        urllib.request.urlretrieve(model_url, model_path)
+
     def _validate_startup(self):
         if not self.cap.isOpened():
             self._show_startup_error(
@@ -110,12 +161,14 @@ class MainWindow(QMainWindow):
             )
             return False
 
-        if not os.path.exists(self.config.model_path):
-            self._show_startup_error(
-                "Model File Missing",
-                f"Could not find the YOLO model file:\n{os.path.abspath(self.config.model_path)}\n\n"
-                "Place yolov8n.pt in the configured path before starting the app.",
-            )
+        if not self._ensure_model_file(self.config.model_path, self.config.model_url, "vehicle"):
+            return False
+
+        if self.config.plate_model_path and not self._ensure_model_file(
+            self.config.plate_model_path,
+            self.config.plate_model_url,
+            "license plate",
+        ):
             return False
 
         try:
@@ -141,8 +194,9 @@ class MainWindow(QMainWindow):
         for tile in self.tiles:
             tile.set_frame(result.frame)
 
-        self.total += result.count
+        self.total += result.vehicle_count
+        self.total_plates += result.plate_count
         self.card1.v.setText(str(self.total))
         self.card2.v.setText("1")
-        self.card3.v.setText(str(random.randint(0, 2)))
-        self.card4.v.setText(str(random.randint(18, 30)))
+        self.card3.v.setText(str(self.total_plates))
+        self.card4.v.setText(self.plate_ocr_reader.engine_name)

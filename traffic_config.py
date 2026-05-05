@@ -5,7 +5,12 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class AppConfig:
     video_path: str = r"d:\its-info\sample-vehicle2.mp4"
+    # video_path: str = r"d:\its-info\lpr-vehicle.mp4"
     model_path: str = r"d:\its-info\yolov8n.pt"
+    model_url: str | None = "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt"
+    plate_model_path: str = r"d:\its-info\license_plate_detector.pt"
+    plate_model_url: str | None = None
+    tesseract_cmd: str | None = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     capture_root: str = r"d:\its-info\capture_vehicles"
     database_path: str = r"d:\its-info\transport.db"
     window_title: str = "Intelligent Transportation System"
