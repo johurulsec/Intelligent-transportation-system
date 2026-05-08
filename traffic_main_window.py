@@ -18,6 +18,8 @@ class MainWindow(QMainWindow):
         self.config = config
         self.total = 0
         self.total_plates = 0
+        self.lp_detection_enabled = self.config.lp_detection_enabled
+        self.ocr_enabled = self.config.ocr_enabled
         self.cap = cv2.VideoCapture(self.config.video_path)
         self.capture_database = CaptureDatabase(self.config.database_path)
         self.plate_ocr_reader = PlateOcrReader(self.config.tesseract_cmd)
@@ -25,12 +27,19 @@ class MainWindow(QMainWindow):
             capture_root=self.config.capture_root,
             save_cooldown_seconds=self.config.save_cooldown_seconds,
             capture_database=self.capture_database,
+            save_images_enabled=self.config.save_images_enabled,
+            save_database_enabled=self.config.save_database_enabled,
         )
         self.detector = VehicleDetector(
             vehicle_model_path=self.config.model_path,
             plate_model_path=self.config.plate_model_path,
             capture_saver=self.capture_saver,
             plate_ocr_reader=self.plate_ocr_reader,
+            lp_detection_enabled=self.lp_detection_enabled,
+            ocr_enabled=self.ocr_enabled,
+            tracker_enabled=self.config.tracker_enabled,
+            tracker_max_distance=self.config.tracker_max_distance,
+            tracker_max_missed_frames=self.config.tracker_max_missed_frames,
         )
 
         self.setWindowTitle(self.config.window_title)
@@ -70,12 +79,18 @@ class MainWindow(QMainWindow):
         self.clock = QLabel()
         top.addWidget(QLabel("Control Center"))
         top.addStretch()
+        self.lp_toggle_button = QPushButton()
+        self.lp_toggle_button.clicked.connect(self.toggle_lp_detection)
+        top.addWidget(self.lp_toggle_button)
+        self.ocr_toggle_button = QPushButton()
+        self.ocr_toggle_button.clicked.connect(self.toggle_ocr)
+        top.addWidget(self.ocr_toggle_button)
         top.addWidget(self.clock)
         content.addLayout(top)
 
         cards = QHBoxLayout()
-        self.card1 = DashboardCard("Vehicles Detected")
-        self.card2 = DashboardCard("Active Stream")
+        self.card1 = DashboardCard("Tracked Vehicles")
+        self.card2 = DashboardCard("Active Tracks")
         self.card3 = DashboardCard("Plates Detected")
         self.card4 = DashboardCard("OCR Engine")
         for card in [self.card1, self.card2, self.card3, self.card4]:
@@ -93,6 +108,7 @@ class MainWindow(QMainWindow):
         wrap = QWidget()
         wrap.setLayout(content)
         main_layout.addWidget(wrap, 1)
+        self._refresh_toggle_buttons()
 
     def _show_startup_error(self, title, message):
         QMessageBox.critical(self, title, message)
@@ -164,7 +180,7 @@ class MainWindow(QMainWindow):
         if not self._ensure_model_file(self.config.model_path, self.config.model_url, "vehicle"):
             return False
 
-        if self.config.plate_model_path and not self._ensure_model_file(
+        if self.lp_detection_enabled and self.config.plate_model_path and not self._ensure_model_file(
             self.config.plate_model_path,
             self.config.plate_model_url,
             "license plate",
@@ -194,9 +210,70 @@ class MainWindow(QMainWindow):
         for tile in self.tiles:
             tile.set_frame(result.frame)
 
-        self.total += result.vehicle_count
+        self.total = result.total_tracked
         self.total_plates += result.plate_count
         self.card1.v.setText(str(self.total))
-        self.card2.v.setText("1")
+        self.card2.v.setText(str(result.active_tracks))
         self.card3.v.setText(str(self.total_plates))
-        self.card4.v.setText(self.plate_ocr_reader.engine_name)
+        self.card4.v.setText(self._ocr_status_text())
+
+    def toggle_lp_detection(self):
+        next_state = not self.lp_detection_enabled
+        if next_state and not self.detector.plate_detection_available:
+            QMessageBox.information(
+                self,
+                "LP Detection Unavailable",
+                "License plate detection cannot be turned on because the plate model is not loaded.",
+            )
+            return
+
+        self.lp_detection_enabled = next_state
+        self.detector.set_lp_detection_enabled(self.lp_detection_enabled)
+        if not self.lp_detection_enabled and self.ocr_enabled:
+            self.ocr_enabled = False
+            self.detector.set_ocr_enabled(False)
+        self._refresh_toggle_buttons()
+
+    def toggle_ocr(self):
+        next_state = not self.ocr_enabled
+        if next_state and not self.lp_detection_enabled:
+            QMessageBox.information(
+                self,
+                "LP Detection Is Off",
+                "Turn on LP detection before enabling OCR.",
+            )
+            return
+        if next_state and not self.detector.ocr_available:
+            QMessageBox.information(
+                self,
+                "OCR Unavailable",
+                "OCR cannot be turned on because no OCR engine is available.",
+            )
+            return
+
+        self.ocr_enabled = next_state
+        self.detector.set_ocr_enabled(self.ocr_enabled)
+        self._refresh_toggle_buttons()
+
+    def _refresh_toggle_buttons(self):
+        lp_button_text = "LP Detection: ON" if self.lp_detection_enabled else "LP Detection: OFF"
+        self.lp_toggle_button.setText(lp_button_text)
+        self.lp_toggle_button.setStyleSheet(self._toggle_button_style(self.lp_detection_enabled))
+
+        ocr_is_active = self.ocr_enabled and self.lp_detection_enabled
+        ocr_button_text = "OCR: ON" if ocr_is_active else "OCR: OFF"
+        self.ocr_toggle_button.setText(ocr_button_text)
+        self.ocr_toggle_button.setStyleSheet(self._toggle_button_style(ocr_is_active))
+
+    def _ocr_status_text(self):
+        if not self.lp_detection_enabled:
+            return "LP Off"
+        if not self.ocr_enabled:
+            return "Off"
+        return self.plate_ocr_reader.status_text
+
+    @staticmethod
+    def _toggle_button_style(enabled):
+        if enabled:
+            return "padding:8px;border-radius:8px;background:#14532d;color:white;"
+        return "padding:8px;border-radius:8px;background:#7f1d1d;color:white;"

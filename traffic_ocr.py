@@ -15,6 +15,10 @@ class PlateOcrReader:
     def available(self):
         return self._read_fn is not None
 
+    @property
+    def status_text(self):
+        return self.engine_name if self.available else "Unavailable"
+
     def read_text(self, plate_image):
         if self._read_fn is None:
             return None

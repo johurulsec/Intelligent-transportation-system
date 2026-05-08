@@ -22,9 +22,9 @@ class CaptureDatabase:
                 """,
                 (
                     saved_capture.vehicle_type,
-                    os.path.basename(saved_capture.vehicle_image_path),
+                    saved_capture.vehicle_image_name,
                     saved_capture.vehicle_image_path,
-                    os.path.basename(saved_capture.plate_image_path) if saved_capture.plate_image_path else None,
+                    saved_capture.plate_image_name,
                     saved_capture.plate_image_path,
                     saved_capture.plate_text,
                     saved_capture.plate_text_path,
